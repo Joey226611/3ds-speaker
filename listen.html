@@ -6,8 +6,13 @@
 </head>
 <body>
 
-<h1>PC Speaker Ready</h1>
+<h1>PC Speaker</h1>
+
 <button onclick="startSystem()">Start speaker</button>
+<br><br>
+
+<select id="voiceSelect"></select>
+<button onclick="testVoice()">Test stem</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -26,46 +31,67 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let voicesLoaded = false;
 let voices = [];
+let voicesLoaded = false;
+let selectedVoiceIndex = 0;
 
-// wacht tot voices geladen zijn
+const select = document.getElementById("voiceSelect");
+
+// voices laden
 speechSynthesis.onvoiceschanged = () => {
   voices = speechSynthesis.getVoices();
   voicesLoaded = true;
-  console.log("Voices geladen:", voices.length);
+
+  select.innerHTML = "";
+
+  voices.forEach((voice, index) => {
+    const option = document.createElement("option");
+    option.value = index;
+    option.textContent = voice.name + " (" + voice.lang + ")";
+    select.appendChild(option);
+  });
+
+  // opgeslagen voice terugzetten
+  const saved = localStorage.getItem("voiceIndex");
+  if(saved !== null){
+    select.value = saved;
+    selectedVoiceIndex = saved;
+  }
 };
 
-// spreek functie
+// voice kiezen opslaan
+select.onchange = () => {
+  selectedVoiceIndex = select.value;
+  localStorage.setItem("voiceIndex", selectedVoiceIndex);
+};
+
 function speak(text){
   if(!voicesLoaded){
-    alert("Voices nog niet geladen, klik opnieuw!");
+    alert("Voices nog niet geladen!");
     return;
   }
 
   const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = "nl-NL";
-
-  // kies eerste beschikbare stem
-  speech.voice = voices[0];
-
+  speech.voice = voices[selectedVoiceIndex];
+  speech.lang = voices[selectedVoiceIndex].lang;
   speechSynthesis.speak(speech);
 }
 
-// start systeem (na klik)
-function startSystem(){
+// testknop
+function testVoice(){
+  speak("Dit is een test van de gekozen stem");
+}
 
-  // test geluid zodat browser audio unlockt
+// start systeem
+function startSystem(){
   speak("Speaker geactiveerd");
 
-  alert("Deze PC luistert nu!");
+  alert("PC luistert nu naar berichten!");
 
-  // luister naar nieuwe berichten
   db.ref("queue").on("child_added", snap => {
     const msg = snap.val().text;
     speak(msg);
   });
-
 }
 </script>
 
