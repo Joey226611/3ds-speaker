@@ -2,12 +2,12 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>PC Listener</title>
+<title>PC Speaker</title>
 </head>
 <body>
 
-<h1>PC Speaker</h1>
-<button onclick="start()">Klik hier om speaker te activeren</button>
+<h1>PC Speaker Ready</h1>
+<button onclick="startSystem()">Start speaker</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -26,31 +26,46 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// unieke pc id maken
-const pcId = "pc_" + Math.random().toString(36).substr(2,9);
+let voicesLoaded = false;
+let voices = [];
 
+// wacht tot voices geladen zijn
+speechSynthesis.onvoiceschanged = () => {
+  voices = speechSynthesis.getVoices();
+  voicesLoaded = true;
+  console.log("Voices geladen:", voices.length);
+};
+
+// spreek functie
 function speak(text){
+  if(!voicesLoaded){
+    alert("Voices nog niet geladen, klik opnieuw!");
+    return;
+  }
+
   const speech = new SpeechSynthesisUtterance(text);
   speech.lang = "nl-NL";
+
+  // kies eerste beschikbare stem
+  speech.voice = voices[0];
+
   speechSynthesis.speak(speech);
 }
 
-function start(){
-  alert("Deze PC is nu online!");
+// start systeem (na klik)
+function startSystem(){
 
-  // PC registreert zich als online
-  db.ref("pcs/" + pcId).set(true);
+  // test geluid zodat browser audio unlockt
+  speak("Speaker geactiveerd");
+
+  alert("Deze PC luistert nu!");
 
   // luister naar nieuwe berichten
   db.ref("queue").on("child_added", snap => {
-
-    // random kiezen of deze PC praat (30% kans)
-    if(Math.random() < 0.3){
-      const msg = snap.val().text;
-      speak(msg);
-    }
-
+    const msg = snap.val().text;
+    speak(msg);
   });
+
 }
 </script>
 
