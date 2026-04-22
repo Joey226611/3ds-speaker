@@ -1,15 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
-<meta charset="utf-8">
-<title>3DS Sender</title>
+<meta charset="UTF-8">
+<title>Voice Control Hub</title>
+
+<style>
+body {
+  margin:0;
+  font-family: Arial;
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color:white;
+  display:flex;
+  justify-content:center;
+  padding:30px;
+}
+
+.card {
+  width:500px;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  border-radius:18px;
+  padding:20px;
+  box-shadow:0 0 40px rgba(0,0,0,0.6);
+}
+
+h1 {
+  font-size:18px;
+  margin-bottom:10px;
+}
+
+input {
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-bottom:10px;
+}
+
+button {
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  background:#38bdf8;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+button:hover {
+  background:#0ea5e9;
+}
+
+.pc-grid {
+  margin-top:15px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.pc {
+  background:rgba(0,0,0,0.3);
+  padding:10px;
+  border-radius:10px;
+  font-size:13px;
+  display:flex;
+  justify-content:space-between;
+}
+
+.status {
+  font-size:12px;
+  opacity:0.7;
+  margin-bottom:10px;
+}
+</style>
 </head>
+
 <body>
 
-<h2>Typ iets dat een random PC gaat zeggen</h2>
+<div class="card">
+  <h1>📡 Voice Control Hub</h1>
 
-<input id="msg" placeholder="Typ bericht">
-<button onclick="sendMsg()">Send</button>
+  <div class="status" id="status">laden...</div>
+
+  <input id="msg" placeholder="Typ bericht...">
+
+  <button onclick="send()">Send to selected PCs</button>
+
+  <div class="pc-grid" id="pcs"></div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -28,18 +106,47 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-function sendMsg(){
-  const text = document.getElementById("msg").value;
+const pcsDiv = document.getElementById("pcs");
+const status = document.getElementById("status");
 
-  const now = Date.now();
+let pcState = {};
 
-  db.ref("queue").push({
-    text: text,
-    time: now,
-    expiry: now + 5000 // 5 seconden later verwijderen
+// live PCs
+db.ref("pcs").on("value", snap => {
+  pcState = snap.val() || {};
+  pcsDiv.innerHTML = "";
+
+  Object.keys(pcState).forEach(id => {
+    const el = document.createElement("div");
+    el.className = "pc";
+
+    el.innerHTML = `
+      <span>${id}</span>
+      <input type="checkbox" checked data-id="${id}">
+    `;
+
+    pcsDiv.appendChild(el);
   });
 
-  alert("Bericht verzonden!");
+  status.innerText = "Online PCs: " + Object.keys(pcState).length;
+});
+
+// send message
+function send(){
+  const text = document.getElementById("msg").value;
+
+  const selected = [];
+  document.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    if(cb.checked) selected.push(cb.dataset.id);
+  });
+
+  db.ref("messages").push({
+    text,
+    targets: selected,
+    time: Date.now()
+  });
+
+  alert("Sent to: " + selected.join(", "));
 }
 </script>
 
