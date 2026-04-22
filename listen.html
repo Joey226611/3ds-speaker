@@ -2,79 +2,62 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>PC Voice Control</title>
+<title>Voice Client</title>
 
 <style>
 body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg, #0f172a, #1e293b);
-  color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  margin:0;
+  font-family:Arial;
+  background:linear-gradient(135deg,#0f172a,#020617);
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
 }
 
 .card {
-  background: rgba(255,255,255,0.06);
-  backdrop-filter: blur(10px);
-  padding: 25px;
-  border-radius: 16px;
-  width: 320px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-}
-
-h1 {
-  font-size: 18px;
-  margin-bottom: 15px;
+  width:350px;
+  background:rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  padding:20px;
+  border-radius:18px;
+  text-align:center;
 }
 
 select, button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 10px;
-  border: none;
-  outline: none;
-}
-
-select {
-  background: #0f172a;
-  color: white;
+  width:100%;
+  padding:10px;
+  margin-top:10px;
+  border-radius:10px;
+  border:none;
 }
 
 button {
-  background: #38bdf8;
-  color: black;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #0ea5e9;
+  background:#38bdf8;
+  font-weight:bold;
 }
 
 .status {
-  margin-top: 10px;
-  font-size: 12px;
-  opacity: 0.8;
+  font-size:12px;
+  opacity:0.7;
+  margin-top:10px;
 }
 </style>
-
 </head>
+
 <body>
 
 <div class="card">
-  <h1>🔊 PC Voice Control</h1>
+  <h2>💻 Voice Client</h2>
 
-  <button onclick="startSystem()">Start systeem</button>
+  <button onclick="start()">Start</button>
 
-  <select id="voiceSelect"></select>
+  <select id="voices"></select>
 
-  <button onclick="testVoice()">Test stem</button>
+  <button onclick="test()">Test voice</button>
 
-  <div class="status" id="status">Status: offline</div>
+  <div class="status" id="status">offline</div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -94,72 +77,75 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+const pcId = "pc_" + Math.random().toString(36).substr(2,8);
+
 let voices = [];
 let selectedVoice = 0;
-let running = false;
 
-const voiceSelect = document.getElementById("voiceSelect");
+const sel = document.getElementById("voices");
 const status = document.getElementById("status");
 
-// voices laden
+// voices load
 speechSynthesis.onvoiceschanged = () => {
   voices = speechSynthesis.getVoices();
 
-  voiceSelect.innerHTML = "";
-  voices.forEach((v, i) => {
+  sel.innerHTML = "";
+  voices.forEach((v,i)=>{
     const opt = document.createElement("option");
     opt.value = i;
     opt.textContent = v.name + " (" + v.lang + ")";
-    voiceSelect.appendChild(opt);
+    sel.appendChild(opt);
   });
 };
 
-// keuze opslaan
-voiceSelect.onchange = () => {
-  selectedVoice = voiceSelect.value;
-};
+sel.onchange = () => selectedVoice = sel.value;
 
-// speak functie
+// speak
 function speak(text){
-  if(!voices.length) return;
-
   const msg = new SpeechSynthesisUtterance(text);
   msg.voice = voices[selectedVoice];
-  msg.lang = voices[selectedVoice].lang;
   speechSynthesis.speak(msg);
 }
 
 // test
-function testVoice(){
-  speak("Dit is een test van de geselecteerde stem");
+function test(){
+  speak("Voice test active");
 }
 
-// start systeem
-function startSystem(){
-  if(running) return;
-  running = true;
+// start
+function start(){
+  status.innerText = "online";
 
-  status.innerText = "Status: online";
+  speak("Client connected");
 
-  speak("Systeem gestart");
+  // register PC
+  db.ref("pcs/" + pcId).set(true);
 
-  // luisteren naar messages
-  db.ref("queue").on("child_added", snap => {
-    const data = snap.val();
-    if(data && data.text){
-      speak(data.text);
+  // keep alive
+  setInterval(()=>{
+    db.ref("pcs/" + pcId).set(true);
+  }, 5000);
+
+  // listen messages
+  db.ref("messages").on("child_added", snap=>{
+    const msg = snap.val();
+
+    if(!msg || !msg.text) return;
+
+    if(msg.targets && msg.targets.includes(pcId)){
+      speak(msg.text);
     }
   });
 
-  // cleanup bot
-  setInterval(() => {
-    db.ref("queue").once("value", snap => {
+  // cleanup old messages
+  setInterval(()=>{
+    db.ref("messages").once("value", snap=>{
       const now = Date.now();
 
-      snap.forEach(child => {
-        const d = child.val();
+      snap.forEach(c=>{
+        const d = c.val();
         if(d.time && now - d.time > 5000){
-          child.ref.remove();
+          c.ref.remove();
         }
       });
     });
