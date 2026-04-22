@@ -2,12 +2,14 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>PC Listener</title>
+<title>3DS Sender</title>
 </head>
 <body>
 
-<h1>PC Speaker</h1>
-<button onclick="start()">Klik hier om speaker te activeren</button>
+<h2>Typ iets dat een random PC gaat zeggen</h2>
+
+<input id="msg" placeholder="Typ bericht">
+<button onclick="sendMsg()">Send</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -26,31 +28,15 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// unieke pc id maken
-const pcId = "pc_" + Math.random().toString(36).substr(2,9);
+function sendMsg(){
+  const text = document.getElementById("msg").value;
 
-function speak(text){
-  const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = "nl-NL";
-  speechSynthesis.speak(speech);
-}
-
-function start(){
-  alert("Deze PC is nu online!");
-
-  // PC registreert zich als online
-  db.ref("pcs/" + pcId).set(true);
-
-  // luister naar nieuwe berichten
-  db.ref("queue").on("child_added", snap => {
-
-    // random kiezen of deze PC praat (30% kans)
-    if(Math.random() < 0.3){
-      const msg = snap.val().text;
-      speak(msg);
-    }
-
+  db.ref("queue").push({
+    text: text,
+    time: Date.now()
   });
+
+  alert("Bericht verzonden!");
 }
 </script>
 
