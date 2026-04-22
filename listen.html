@@ -1,18 +1,81 @@
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
-<meta charset="utf-8">
-<title>PC Speaker</title>
+<meta charset="UTF-8">
+<title>PC Voice Control</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.card {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(10px);
+  padding: 25px;
+  border-radius: 16px;
+  width: 320px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+h1 {
+  font-size: 18px;
+  margin-bottom: 15px;
+}
+
+select, button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+}
+
+select {
+  background: #0f172a;
+  color: white;
+}
+
+button {
+  background: #38bdf8;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0ea5e9;
+}
+
+.status {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+</style>
+
 </head>
 <body>
 
-<h1>PC Speaker</h1>
+<div class="card">
+  <h1>🔊 PC Voice Control</h1>
 
-<button onclick="startSystem()">Start speaker</button>
-<br><br>
+  <button onclick="startSystem()">Start systeem</button>
 
-<select id="voiceSelect"></select>
-<button onclick="testVoice()">Test stem</button>
+  <select id="voiceSelect"></select>
+
+  <button onclick="testVoice()">Test stem</button>
+
+  <div class="status" id="status">Status: offline</div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -32,66 +95,75 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let voices = [];
-let voicesLoaded = false;
-let selectedVoiceIndex = 0;
+let selectedVoice = 0;
+let running = false;
 
-const select = document.getElementById("voiceSelect");
+const voiceSelect = document.getElementById("voiceSelect");
+const status = document.getElementById("status");
 
 // voices laden
 speechSynthesis.onvoiceschanged = () => {
   voices = speechSynthesis.getVoices();
-  voicesLoaded = true;
 
-  select.innerHTML = "";
-
-  voices.forEach((voice, index) => {
-    const option = document.createElement("option");
-    option.value = index;
-    option.textContent = voice.name + " (" + voice.lang + ")";
-    select.appendChild(option);
+  voiceSelect.innerHTML = "";
+  voices.forEach((v, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = v.name + " (" + v.lang + ")";
+    voiceSelect.appendChild(opt);
   });
-
-  // opgeslagen voice terugzetten
-  const saved = localStorage.getItem("voiceIndex");
-  if(saved !== null){
-    select.value = saved;
-    selectedVoiceIndex = saved;
-  }
 };
 
-// voice kiezen opslaan
-select.onchange = () => {
-  selectedVoiceIndex = select.value;
-  localStorage.setItem("voiceIndex", selectedVoiceIndex);
+// keuze opslaan
+voiceSelect.onchange = () => {
+  selectedVoice = voiceSelect.value;
 };
 
+// speak functie
 function speak(text){
-  if(!voicesLoaded){
-    alert("Voices nog niet geladen!");
-    return;
-  }
+  if(!voices.length) return;
 
-  const speech = new SpeechSynthesisUtterance(text);
-  speech.voice = voices[selectedVoiceIndex];
-  speech.lang = voices[selectedVoiceIndex].lang;
-  speechSynthesis.speak(speech);
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.voice = voices[selectedVoice];
+  msg.lang = voices[selectedVoice].lang;
+  speechSynthesis.speak(msg);
 }
 
-// testknop
+// test
 function testVoice(){
-  speak("Dit is een test van de gekozen stem");
+  speak("Dit is een test van de geselecteerde stem");
 }
 
 // start systeem
 function startSystem(){
-  speak("Speaker geactiveerd");
+  if(running) return;
+  running = true;
 
-  alert("PC luistert nu naar berichten!");
+  status.innerText = "Status: online";
 
+  speak("Systeem gestart");
+
+  // luisteren naar messages
   db.ref("queue").on("child_added", snap => {
-    const msg = snap.val().text;
-    speak(msg);
+    const data = snap.val();
+    if(data && data.text){
+      speak(data.text);
+    }
   });
+
+  // cleanup bot
+  setInterval(() => {
+    db.ref("queue").once("value", snap => {
+      const now = Date.now();
+
+      snap.forEach(child => {
+        const d = child.val();
+        if(d.time && now - d.time > 5000){
+          child.ref.remove();
+        }
+      });
+    });
+  }, 3000);
 }
 </script>
 
