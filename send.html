@@ -31,9 +31,12 @@ const db = firebase.database();
 function sendMsg(){
   const text = document.getElementById("msg").value;
 
+  const now = Date.now();
+
   db.ref("queue").push({
     text: text,
-    time: Date.now()
+    time: now,
+    expiry: now + 5000 // 5 seconden later verwijderen
   });
 
   alert("Bericht verzonden!");
