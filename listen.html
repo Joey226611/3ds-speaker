@@ -2,30 +2,31 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>Voice Client</title>
+<title>VOICE NODE v5</title>
 
 <style>
-body {
+body{
   margin:0;
   font-family:Arial;
-  background:linear-gradient(135deg,#0f172a,#020617);
-  color:white;
+  background: radial-gradient(circle at top,#000,#020617);
+  color:#00ffcc;
   display:flex;
   justify-content:center;
   align-items:center;
   height:100vh;
 }
 
-.card {
-  width:350px;
-  background:rgba(255,255,255,0.06);
-  backdrop-filter: blur(12px);
+.card{
+  width:360px;
+  background:rgba(0,255,200,0.05);
+  border:1px solid rgba(0,255,200,0.2);
+  border-radius:20px;
   padding:20px;
-  border-radius:18px;
   text-align:center;
+  box-shadow:0 0 30px #00ffcc22;
 }
 
-select, button {
+select,button{
   width:100%;
   padding:10px;
   margin-top:10px;
@@ -33,15 +34,9 @@ select, button {
   border:none;
 }
 
-button {
-  background:#38bdf8;
+button{
+  background:#00ffcc;
   font-weight:bold;
-}
-
-.status {
-  font-size:12px;
-  opacity:0.7;
-  margin-top:10px;
 }
 </style>
 </head>
@@ -49,107 +44,103 @@ button {
 <body>
 
 <div class="card">
-  <h2>💻 Voice Client</h2>
+  <h2>💠 VOICE NODE</h2>
 
-  <button onclick="start()">Start</button>
+  <button onclick="start()">ACTIVATE</button>
 
   <select id="voices"></select>
 
-  <button onclick="test()">Test voice</button>
-
-  <div class="status" id="status">offline</div>
+  <button onclick="test()">TEST</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+<!-- 🔥 shared firebase -->
+<script src="firebase.js"></script>
+
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyAVGSWMm5GbhtjH95l8DJK0DkJgO1Zv04Q",
-  authDomain: "ds-tts-experiment.firebaseapp.com",
-  databaseURL: "https://ds-tts-experiment-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "ds-tts-experiment",
-  storageBucket: "ds-tts-experiment.firebasestorage.app",
-  messagingSenderId: "2627176558",
-  appId: "1:2627176558:web:02c824589f63eaf9a67e7f"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-const pcId = "pc_" + Math.random().toString(36).substr(2,8);
+const pcId = "node_" + Math.random().toString(36).substr(2,8);
 
 let voices = [];
-let selectedVoice = 0;
+let selected = 0;
 
 const sel = document.getElementById("voices");
-const status = document.getElementById("status");
 
-// voices load
-speechSynthesis.onvoiceschanged = () => {
+// voices
+speechSynthesis.onvoiceschanged = ()=>{
   voices = speechSynthesis.getVoices();
 
   sel.innerHTML = "";
   voices.forEach((v,i)=>{
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = v.name + " (" + v.lang + ")";
-    sel.appendChild(opt);
+    const o = document.createElement("option");
+    o.value = i;
+    o.textContent = v.name;
+    sel.appendChild(o);
   });
 };
 
-sel.onchange = () => selectedVoice = sel.value;
+sel.onchange = ()=> selected = sel.value;
 
 // speak
-function speak(text){
-  const msg = new SpeechSynthesisUtterance(text);
-  msg.voice = voices[selectedVoice];
-  speechSynthesis.speak(msg);
+function speak(t){
+  const m = new SpeechSynthesisUtterance(t);
+  m.voice = voices[selected];
+  speechSynthesis.speak(m);
 }
 
-// test
-function test(){
-  speak("Voice test active");
+// sound
+function playSound(name){
+  if(!name) return;
+  const a = new Audio(`https://YOUR_GITHUB.github.io/SE/${name}.mp3`);
+  a.play();
 }
 
-// start
 function start(){
-  status.innerText = "online";
+  speak("node activated");
 
-  speak("Client connected");
+  db.ref("pcs/" + pcId).set({
+    online:true,
+    lastSeen:Date.now()
+  });
 
-  // register PC
-  db.ref("pcs/" + pcId).set(true);
-
-  // keep alive
   setInterval(()=>{
-    db.ref("pcs/" + pcId).set(true);
-  }, 5000);
+    db.ref("pcs/" + pcId).update({
+      lastSeen:Date.now()
+    });
+  },4000);
 
-  // listen messages
   db.ref("messages").on("child_added", snap=>{
-    const msg = snap.val();
+    const m = snap.val();
+    if(!m) return;
 
-    if(!msg || !msg.text) return;
-
-    if(msg.targets && msg.targets.includes(pcId)){
-      speak(msg.text);
+    if(m.targets.includes(pcId)){
+      playSound(m.sound);
+      speak(m.text);
     }
   });
 
-  // cleanup old messages
+  // auto remove offline nodes
   setInterval(()=>{
-    db.ref("messages").once("value", snap=>{
+    db.ref("pcs").once("value", snap=>{
       const now = Date.now();
 
-      snap.forEach(c=>{
-        const d = c.val();
-        if(d.time && now - d.time > 5000){
-          c.ref.remove();
+      snap.forEach(p=>{
+        const d = p.val();
+        if(d.lastSeen && now - d.lastSeen > 8000){
+          p.ref.remove();
         }
       });
     });
-  }, 3000);
+  },5000);
+
+  window.addEventListener("beforeunload", ()=>{
+    db.ref("pcs/" + pcId).remove();
+  });
+}
+
+function test(){
+  speak("test signal active");
 }
 </script>
 
