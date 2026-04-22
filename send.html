@@ -2,75 +2,72 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>Voice Control Hub</title>
+<title>NEON CONTROL HUB v5</title>
 
 <style>
-body {
+body{
   margin:0;
-  font-family: Arial;
-  background: radial-gradient(circle at top, #0f172a, #020617);
-  color:white;
+  font-family:Arial;
+  background: radial-gradient(circle at top,#050816,#000);
+  color:#00f5ff;
   display:flex;
   justify-content:center;
   padding:30px;
 }
 
-.card {
-  width:500px;
-  background: rgba(255,255,255,0.06);
-  backdrop-filter: blur(12px);
-  border-radius:18px;
+.card{
+  width:600px;
+  background:rgba(0,255,255,0.05);
+  border:1px solid rgba(0,255,255,0.2);
+  border-radius:20px;
   padding:20px;
-  box-shadow:0 0 40px rgba(0,0,0,0.6);
+  box-shadow:0 0 40px #00f5ff22;
 }
 
-h1 {
-  font-size:18px;
-  margin-bottom:10px;
+h1{
+  text-align:center;
+  letter-spacing:4px;
 }
 
-input {
+input,select{
   width:100%;
   padding:12px;
-  border-radius:10px;
+  margin-top:10px;
+  border-radius:12px;
   border:none;
-  margin-bottom:10px;
+  background:#0a0f1f;
+  color:#00f5ff;
 }
 
-button {
+button{
   width:100%;
   padding:12px;
+  margin-top:10px;
   border:none;
-  border-radius:10px;
-  background:#38bdf8;
+  border-radius:12px;
+  background:#00f5ff;
   font-weight:bold;
   cursor:pointer;
 }
 
-button:hover {
-  background:#0ea5e9;
+button:hover{
+  background:#00c8ff;
 }
 
-.pc-grid {
+.grid{
   margin-top:15px;
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:10px;
 }
 
-.pc {
-  background:rgba(0,0,0,0.3);
+.pc{
+  background:rgba(0,255,255,0.08);
   padding:10px;
-  border-radius:10px;
-  font-size:13px;
+  border-radius:12px;
   display:flex;
   justify-content:space-between;
-}
-
-.status {
-  font-size:12px;
-  opacity:0.7;
-  margin-bottom:10px;
+  font-size:13px;
 }
 </style>
 </head>
@@ -78,45 +75,38 @@ button:hover {
 <body>
 
 <div class="card">
-  <h1>📡 Voice Control Hub</h1>
+  <h1>⚡ CONTROL HUB</h1>
 
-  <div class="status" id="status">laden...</div>
+  <input id="msg" placeholder="Enter signal">
 
-  <input id="msg" placeholder="Typ bericht...">
+  <select id="sound">
+    <option value="">No sound</option>
+    <option value="beep">beep</option>
+    <option value="pop">pop</option>
+    <option value="alert">alert</option>
+  </select>
 
-  <button onclick="send()">Send to selected PCs</button>
+  <button onclick="send()">TRANSMIT</button>
 
-  <div class="pc-grid" id="pcs"></div>
+  <h3>🖥 ACTIVE NODES</h3>
+  <div class="grid" id="pcs"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+<!-- 🔥 externe firebase file -->
+<script src="firebase.js"></script>
+
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyAVGSWMm5GbhtjH95l8DJK0DkJgO1Zv04Q",
-  authDomain: "ds-tts-experiment.firebaseapp.com",
-  databaseURL: "https://ds-tts-experiment-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "ds-tts-experiment",
-  storageBucket: "ds-tts-experiment.firebasestorage.app",
-  messagingSenderId: "2627176558",
-  appId: "1:2627176558:web:02c824589f63eaf9a67e7f"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
 const pcsDiv = document.getElementById("pcs");
-const status = document.getElementById("status");
 
-let pcState = {};
-
-// live PCs
-db.ref("pcs").on("value", snap => {
-  pcState = snap.val() || {};
+// live pcs
+db.ref("pcs").on("value", snap=>{
+  const data = snap.val() || {};
   pcsDiv.innerHTML = "";
 
-  Object.keys(pcState).forEach(id => {
+  Object.keys(data).forEach(id=>{
     const el = document.createElement("div");
     el.className = "pc";
 
@@ -127,26 +117,26 @@ db.ref("pcs").on("value", snap => {
 
     pcsDiv.appendChild(el);
   });
-
-  status.innerText = "Online PCs: " + Object.keys(pcState).length;
 });
 
-// send message
+// send
 function send(){
   const text = document.getElementById("msg").value;
+  const sound = document.getElementById("sound").value;
 
-  const selected = [];
-  document.querySelectorAll("input[type=checkbox]").forEach(cb => {
-    if(cb.checked) selected.push(cb.dataset.id);
+  const targets = [];
+  document.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+    if(cb.checked) targets.push(cb.dataset.id);
   });
 
   db.ref("messages").push({
     text,
-    targets: selected,
+    sound,
+    targets,
     time: Date.now()
   });
 
-  alert("Sent to: " + selected.join(", "));
+  alert("Signal sent 🚀");
 }
 </script>
 
