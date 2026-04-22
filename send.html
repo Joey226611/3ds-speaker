@@ -2,75 +2,46 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<title>Voice Control Hub</title>
+<title>Voice Client</title>
 
 <style>
 body {
   margin:0;
-  font-family: Arial;
-  background: radial-gradient(circle at top, #0f172a, #020617);
+  font-family:Arial;
+  background:linear-gradient(135deg,#0f172a,#020617);
   color:white;
   display:flex;
   justify-content:center;
-  padding:30px;
+  align-items:center;
+  height:100vh;
 }
 
 .card {
-  width:500px;
-  background: rgba(255,255,255,0.06);
+  width:350px;
+  background:rgba(255,255,255,0.06);
   backdrop-filter: blur(12px);
-  border-radius:18px;
   padding:20px;
-  box-shadow:0 0 40px rgba(0,0,0,0.6);
+  border-radius:18px;
+  text-align:center;
 }
 
-h1 {
-  font-size:18px;
-  margin-bottom:10px;
-}
-
-input {
+select, button {
   width:100%;
-  padding:12px;
+  padding:10px;
+  margin-top:10px;
   border-radius:10px;
   border:none;
-  margin-bottom:10px;
 }
 
 button {
-  width:100%;
-  padding:12px;
-  border:none;
-  border-radius:10px;
   background:#38bdf8;
   font-weight:bold;
-  cursor:pointer;
-}
-
-button:hover {
-  background:#0ea5e9;
-}
-
-.pc-grid {
-  margin-top:15px;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-
-.pc {
-  background:rgba(0,0,0,0.3);
-  padding:10px;
-  border-radius:10px;
-  font-size:13px;
-  display:flex;
-  justify-content:space-between;
 }
 
 .status {
   font-size:12px;
   opacity:0.7;
-  margin-bottom:10px;
+  margin-top:10px;
 }
 </style>
 </head>
@@ -78,15 +49,15 @@ button:hover {
 <body>
 
 <div class="card">
-  <h1>📡 Voice Control Hub</h1>
+  <h2>💻 Voice Client</h2>
 
-  <div class="status" id="status">laden...</div>
+  <button onclick="start()">Start</button>
 
-  <input id="msg" placeholder="Typ bericht...">
+  <select id="voices"></select>
 
-  <button onclick="send()">Send to selected PCs</button>
+  <button onclick="test()">Test voice</button>
 
-  <div class="pc-grid" id="pcs"></div>
+  <div class="status" id="status">offline</div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -106,47 +77,79 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-const pcsDiv = document.getElementById("pcs");
+const pcId = "pc_" + Math.random().toString(36).substr(2,8);
+
+let voices = [];
+let selectedVoice = 0;
+
+const sel = document.getElementById("voices");
 const status = document.getElementById("status");
 
-let pcState = {};
+// voices load
+speechSynthesis.onvoiceschanged = () => {
+  voices = speechSynthesis.getVoices();
 
-// live PCs
-db.ref("pcs").on("value", snap => {
-  pcState = snap.val() || {};
-  pcsDiv.innerHTML = "";
+  sel.innerHTML = "";
+  voices.forEach((v,i)=>{
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = v.name + " (" + v.lang + ")";
+    sel.appendChild(opt);
+  });
+};
 
-  Object.keys(pcState).forEach(id => {
-    const el = document.createElement("div");
-    el.className = "pc";
+sel.onchange = () => selectedVoice = sel.value;
 
-    el.innerHTML = `
-      <span>${id}</span>
-      <input type="checkbox" checked data-id="${id}">
-    `;
+// speak
+function speak(text){
+  const msg = new SpeechSynthesisUtterance(text);
+  msg.voice = voices[selectedVoice];
+  speechSynthesis.speak(msg);
+}
 
-    pcsDiv.appendChild(el);
+// test
+function test(){
+  speak("Voice test active");
+}
+
+// start
+function start(){
+  status.innerText = "online";
+
+  speak("Client connected");
+
+  // register PC
+  db.ref("pcs/" + pcId).set(true);
+
+  // keep alive
+  setInterval(()=>{
+    db.ref("pcs/" + pcId).set(true);
+  }, 5000);
+
+  // listen messages
+  db.ref("messages").on("child_added", snap=>{
+    const msg = snap.val();
+
+    if(!msg || !msg.text) return;
+
+    if(msg.targets && msg.targets.includes(pcId)){
+      speak(msg.text);
+    }
   });
 
-  status.innerText = "Online PCs: " + Object.keys(pcState).length;
-});
+  // cleanup old messages
+  setInterval(()=>{
+    db.ref("messages").once("value", snap=>{
+      const now = Date.now();
 
-// send message
-function send(){
-  const text = document.getElementById("msg").value;
-
-  const selected = [];
-  document.querySelectorAll("input[type=checkbox]").forEach(cb => {
-    if(cb.checked) selected.push(cb.dataset.id);
-  });
-
-  db.ref("messages").push({
-    text,
-    targets: selected,
-    time: Date.now()
-  });
-
-  alert("Sent to: " + selected.join(", "));
+      snap.forEach(c=>{
+        const d = c.val();
+        if(d.time && now - d.time > 5000){
+          c.ref.remove();
+        }
+      });
+    });
+  }, 3000);
 }
 </script>
 
